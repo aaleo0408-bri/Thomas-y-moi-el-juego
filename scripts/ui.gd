@@ -111,7 +111,16 @@ func show_map() -> void:
 		var node := Button.new()
 		node.position = node_positions[i] - Vector2(29, 29)
 		node.size = Vector2(58, 58)
-		node.text = str(i + 1) if unlocked else "· ·"
+		if unlocked:
+			node.text = str(i + 1)
+		else:
+			var lock := Label.new()
+			lock.text = "🔒"
+			lock.position = Vector2(0, 0)
+			lock.size = node.size
+			lock.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			lock.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			node.add_child(lock)
 		node.disabled = not unlocked or game.lives <= 0
 		node.add_theme_font_size_override("font_size", 19)
 		node.add_theme_color_override("font_color", Color("192531"))
@@ -125,11 +134,20 @@ func show_map() -> void:
 		node.add_theme_stylebox_override("disabled", style)
 		node.pressed.connect(_enter_level.bind(world, i))
 		current_panel.add_child(node)
-		label(current_panel, "★".repeat(stars) + "☆".repeat(3 - stars), node_positions[i] + Vector2(-35, 28), Vector2(70, 24), 14, Color("ffe36c"), true)
+		if unlocked:
+			label(current_panel, "★".repeat(stars) + "☆".repeat(3 - stars), node_positions[i] + Vector2(-35, 28), Vector2(70, 24), 14, Color("ffe36c"), true)
 	label(current_panel, "3 estrellas desbloquean cada etapa", Vector2(357, 584), Vector2(438, 31), 16, Color("dce4d8"), true)
 	button(current_panel, "TÍTULO", Vector2(28, 572), Vector2(132, 48), show_title, Color("d39b76"), 16)
 	if game.lives <= 0:
 		button(current_panel, "NUEVA PARTIDA", Vector2(973, 570), Vector2(160, 50), _start_new_run, Color("f4bd5c"), 14)
+
+	if world >= game.unlocked_worlds():
+		var overlay := ColorRect.new()
+		overlay.color = Color("100c18", 0.8)
+		overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		current_panel.add_child(overlay)
+		label(current_panel, "🔒", Vector2(460, 200), Vector2(232, 232), 100, Color.WHITE, true)
+		label(current_panel, "MUNDO BLOQUEADO", Vector2(300, 400), Vector2(552, 54), 30, Color.WHITE, true)
 
 func _add_map_scenery(world: int) -> void:
 	var color := WORLD_COLORS[world]
@@ -151,7 +169,7 @@ func _add_path(parent: Control, from: Vector2, to: Vector2, world: int) -> void:
 
 func _change_world(amount: int) -> void:
 	var target := game.current_world + amount
-	if target < 0 or target >= 3 or target >= game.unlocked_worlds():
+	if target < 0 or target >= 3:
 		return
 	game.current_world = target
 	show_map()
