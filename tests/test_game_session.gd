@@ -33,7 +33,7 @@ func _initialize() -> void:
 	_check(not session.is_level_unlocked(1, 0), "No desbloquea mundos posteriores saltándose el anterior")
 	session.best_stars["0-9"] = 3
 	session.lives = 5
-	var previous := session.lives
+	var previous: int = session.lives
 	_check(session.lose_life(), "Registra pérdida de vida")
 	_check(session.lives == previous - 1, "Una muerte resta una sola vida")
 	_check(session.lives == 4, "Cambios de nivel no regeneran vidas")

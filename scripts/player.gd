@@ -18,6 +18,8 @@ var facing := 1.0
 var _coyote_timer := 0.0
 var _jump_buffer_timer := 0.0
 var _blink_timer := 0.0
+var _run_t := 0.0
+var _was_on_floor := false
 
 func _physics_process(delta: float) -> void:
 	if invulnerable:
@@ -27,6 +29,7 @@ func _physics_process(delta: float) -> void:
 		_blink_timer = 0.0
 		$HeroArt.modulate.a = 1.0
 	up_direction = Vector2.UP * gravity_sign
+	_sync_art(delta)
 	if not input_enabled:
 		_coyote_timer = 0.0
 		_jump_buffer_timer = 0.0
@@ -37,7 +40,6 @@ func _physics_process(delta: float) -> void:
 	var direction := Input.get_axis("move_left", "move_right")
 	if direction != 0.0:
 		facing = signf(direction)
-		$HeroArt.scale.x = facing
 	velocity.x = direction * move_speed
 	if Input.is_action_just_pressed("flip_gravity"):
 		flip_gravity()
@@ -60,13 +62,36 @@ func _physics_process(delta: float) -> void:
 	position.x = clampf(position.x, bounds_left, bounds_right)
 	_check_stomps()
 
+## Alimenta la animación del héroe (pose, dirección, gravedad, squash al aterrizar).
+func _sync_art(delta: float) -> void:
+	var art = get_node_or_null("HeroArt")
+	if art == null:
+		return
+	var on_floor := is_on_floor()
+	if on_floor and absf(velocity.x) > 10.0:
+		_run_t += delta
+	elif on_floor:
+		_run_t = 0.0
+	if on_floor and not _was_on_floor:
+		art.squash = 0.18
+	_was_on_floor = on_floor
+	art.squash = maxf(0.0, art.squash - delta)
+	art.facing = facing
+	art.grav = gravity_sign
+	if not on_floor:
+		art.kind = "fall" if velocity.y * gravity_sign > 60.0 else "jump"
+	elif absf(velocity.x) > 10.0:
+		art.kind = "run"
+		art.phase = int(_run_t * 10.0) % 4
+	else:
+		art.kind = "idle"
+
 func flip_gravity() -> void:
 	gravity_sign *= -1.0
 	up_direction = Vector2.UP * gravity_sign
 	_coyote_timer = 0.0
 	_jump_buffer_timer = 0.0
 	velocity.y = -gravity_sign * 90.0
-	$HeroArt.scale = Vector2(facing, gravity_sign)
 	if has_node("GravityTrail"):
 		var trail: Polygon2D = $GravityTrail
 		trail.color = Color("bb91db") if gravity_sign < 0.0 else Color("85c7a5")

@@ -68,7 +68,7 @@ func save_game() -> void:
 	file.store_string(JSON.stringify({"version": SAVE_VERSION, "lives": lives, "best_stars": best_stars}))
 
 func begin_new_run() -> void:
-	if get_tree() != null:
+	if is_inside_tree():
 		get_tree().paused = false
 	lives = STARTING_LIVES
 	current_world = 0
