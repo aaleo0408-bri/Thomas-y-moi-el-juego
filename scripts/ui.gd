@@ -41,9 +41,12 @@ func label(parent: Node, text: String, pos: Vector2, size: Vector2, font_size :=
 	item.size = size
 	item.add_theme_font_size_override("font_size", font_size)
 	item.add_theme_color_override("font_color", color)
-	item.add_theme_color_override("font_shadow_color", Color("182332"))
+	item.add_theme_color_override("font_shadow_color", Color(0.04, 0.03, 0.09, 0.7))
 	item.add_theme_constant_override("shadow_offset_x", 2)
 	item.add_theme_constant_override("shadow_offset_y", 3)
+	if font_size >= 24:
+		item.add_theme_color_override("font_outline_color", Color("10131c"))
+		item.add_theme_constant_override("outline_size", 6)
 	item.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER if centered else HORIZONTAL_ALIGNMENT_LEFT
 	item.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	item.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -60,18 +63,26 @@ func button(parent: Node, text: String, pos: Vector2, size: Vector2, callback: C
 	b.add_theme_color_override("font_hover_color", Color("182332"))
 	b.add_theme_color_override("font_pressed_color", Color("182332"))
 	var style := StyleBoxFlat.new()
-	style.bg_color = accent
-	style.set_corner_radius_all(9)
-	style.border_width_bottom = 5
-	style.border_color = accent.darkened(0.3)
+	style.bg_color = accent.lightened(0.12)
+	style.set_corner_radius_all(14)
+	style.set_border_width_all(2)
+	style.border_width_bottom = 6
+	style.border_color = Color("1a1224")
+	style.shadow_color = Color(0, 0, 0, 0.4)
+	style.shadow_size = 6
+	style.shadow_offset = Vector2(0, 5)
+	style.set_expand_margin_all(0)
 	b.add_theme_stylebox_override("normal", style)
 	var hover := style.duplicate()
-	hover.bg_color = accent.lightened(0.14)
+	hover.bg_color = accent.lightened(0.26)
 	b.add_theme_stylebox_override("hover", hover)
 	var pressed := style.duplicate()
-	pressed.bg_color = accent.darkened(0.1)
+	pressed.bg_color = accent.darkened(0.08)
 	pressed.border_width_bottom = 2
+	pressed.shadow_size = 2
+	pressed.shadow_offset = Vector2(0, 1)
 	b.add_theme_stylebox_override("pressed", pressed)
+	b.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 	b.pressed.connect(callback)
 	parent.add_child(b)
 	return b
@@ -79,8 +90,8 @@ func button(parent: Node, text: String, pos: Vector2, size: Vector2, callback: C
 func show_title() -> void:
 	_remove_active_level()
 	clear_panel()
-	panel_bg(current_panel, Color("101c2b"))
-	label(current_panel, "T / GRAVITY", Vector2(120, 100), Vector2(912, 75), 58, Color("ffe45e"), true)
+	_add_backdrop(0)
+	label(current_panel, "T / GRAVITY", Vector2(96, 88), Vector2(960, 98), 72, Color("ffd23f"), true)
 	label(current_panel, "UNA AVENTURA AL REVÉS", Vector2(180, 180), Vector2(792, 40), 24, Color("a9d2d2"), true)
 	label(current_panel, "Bosque  ·  Ciudad  ·  Inframundo", Vector2(180, 246), Vector2(792, 38), 21, Color("d7e1dc"), true)
 	button(current_panel, "NUEVA PARTIDA", Vector2(430, 330), Vector2(292, 65), _start_new_run, Color("f4bd5c"), 22)
@@ -95,8 +106,7 @@ func show_map() -> void:
 	_remove_active_level()
 	clear_panel()
 	var world := clampi(game.current_world, 0, 2)
-	panel_bg(current_panel, [Color("203e3b"), Color("28364c"), Color("241d38")][world])
-	_add_map_scenery(world)
+	_add_backdrop(world)
 	label(current_panel, WORLD_NAMES[world], Vector2(300, 28), Vector2(552, 54), 29, Color("fff0c8"), true)
 	label(current_panel, WORLD_TAGLINES[world], Vector2(350, 76), Vector2(452, 32), 17, Color("d6dfd8"), true)
 	label(current_panel, "VIDAS  %d / 5" % game.lives, Vector2(30, 24), Vector2(170, 38), 20, Color("ffdf81"))
@@ -106,8 +116,8 @@ func show_map() -> void:
 	for i in range(9):
 		_add_path(current_panel, node_positions[i], node_positions[i + 1], world)
 	for i in range(10):
-		var unlocked := game.is_level_unlocked(world, i) and world < game.unlocked_worlds()
-		var stars := game.stars_for(world, i)
+		var unlocked: bool = game.is_level_unlocked(world, i) and world < game.unlocked_worlds()
+		var stars: int = game.stars_for(world, i)
 		var node := Button.new()
 		node.position = node_positions[i] - Vector2(29, 29)
 		node.size = Vector2(58, 58)
@@ -149,26 +159,29 @@ func show_map() -> void:
 		label(current_panel, "🔒", Vector2(460, 200), Vector2(232, 232), 100, Color.WHITE, true)
 		label(current_panel, "MUNDO BLOQUEADO", Vector2(300, 400), Vector2(552, 54), 30, Color.WHITE, true)
 
-func _add_map_scenery(world: int) -> void:
-	var color := WORLD_COLORS[world]
-	for i in range(18):
-		var shape := ColorRect.new()
-		shape.color = color.darkened(0.55 + float(i % 3) * 0.08)
-		shape.position = Vector2(float(i) * 74 - 20, 150 + float((i * 53) % 330))
-		shape.size = Vector2(42, 480 - shape.position.y)
-		shape.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		current_panel.add_child(shape)
+## Fondo por capas del mundo (mismo escenario que dentro del nivel), sin bloquear clics.
+func _add_backdrop(world: int) -> void:
+	var bd := Node2D.new()
+	bd.set_script(load("res://scripts/backdrop.gd"))
+	bd.world = world
+	current_panel.add_child(bd)
 
 func _add_path(parent: Control, from: Vector2, to: Vector2, world: int) -> void:
+	var under := Line2D.new()
+	under.points = PackedVector2Array([from, to])
+	under.width = 13
+	under.default_color = Color(0.06, 0.05, 0.12, 0.6)
+	under.z_index = 0
+	parent.add_child(under)
 	var line := Line2D.new()
 	line.points = PackedVector2Array([from, to])
-	line.width = 7
-	line.default_color = WORLD_COLORS[world].lightened(0.2)
+	line.width = 5
+	line.default_color = WORLD_COLORS[world].lightened(0.45)
 	line.z_index = 1
 	parent.add_child(line)
 
 func _change_world(amount: int) -> void:
-	var target := game.current_world + amount
+	var target: int = game.current_world + amount
 	if target < 0 or target >= 3:
 		return
 	game.current_world = target

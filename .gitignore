@@ -1,0 +1,25 @@
+# Dependencias (se restauran con npm install)
+node_modules/
+
+# Godot: caché de importación y ajustes locales del editor
+.godot/
+*.translation
+export_presets.cfg
+
+# Configuración local de Claude Code
+.claude/
+
+# Capturas y artefactos de prueba generados
+/test_*.png
+/screenshot_initial.png
+/vista_8bit_heroe.png
+
+# Imágenes de referencia de trabajo (no son parte del juego)
+/*.webp
+
+# Sistema operativo y editores
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+.idea/

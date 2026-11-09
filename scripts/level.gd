@@ -1,4 +1,5 @@
 extends Node2D
+const SB := preload("res://scripts/sprite_bank.gd")
 
 signal finished(stars: int)
 signal life_lost
@@ -23,6 +24,7 @@ var screen_size := Vector2(1152, 648)
 var palette: Dictionary
 var death_handled := false
 var mobile_controls := false
+var backdrop: Node2D
 
 func _ready() -> void:
 	game = get_node("/root/GameSession")
@@ -43,6 +45,11 @@ func _build_level() -> void:
 	mobile_controls = OS.has_feature("mobile") or DisplayServer.is_touchscreen_available()
 	_add_rect(self, Vector2(level_length * 0.5, screen_size.y * 0.5), Vector2(level_length, screen_size.y), palette.sky, -20)
 	_build_backdrop()
+	var ground = Node2D.new()
+	ground.set_script(load("res://scripts/ground_art.gd"))
+	ground.world = world_index
+	ground.level_length = level_length
+	add_child(ground)
 	var adjusted_gaps: Array[Vector2] = []
 	for i in range(gap_positions.size()):
 		var gap_start := gap_positions[i] + float(level_index * 19 % 120)
@@ -60,7 +67,7 @@ func _build_level() -> void:
 		floor_segments.append(Vector2(cursor, level_length))
 	for segment in floor_segments:
 		var segment_width := segment.y - segment.x
-		_add_platform(Vector2((segment.x + segment.y) * 0.5, 632), Vector2(segment_width, 32), palette.ground)
+		_add_platform(Vector2((segment.x + segment.y) * 0.5, 632), Vector2(segment_width, 32), palette.ground, "floor", palette.grass, palette.dark)
 	var ceiling_segments: Array[Vector2] = []
 	cursor = 0.0
 	for gap in adjusted_gaps:
@@ -72,15 +79,13 @@ func _build_level() -> void:
 	if cursor < level_length:
 		ceiling_segments.append(Vector2(cursor, level_length))
 	for segment in ceiling_segments:
-		_add_platform(Vector2((segment.x + segment.y) * 0.5, 16), Vector2(segment.y - segment.x, 28), palette.ceiling)
+		_add_platform(Vector2((segment.x + segment.y) * 0.5, 16), Vector2(segment.y - segment.x, 28), palette.ceiling, "ceiling", palette.grass, palette.dark)
 	for index in range(10):
 		var x := 160.0 + index * (level_length - 320.0) / 9.0
 		var ground_y := 455.0 - float(index % 3) * 26.0
 		var ceiling_y := 174.0 + float(index % 3) * 25.0
-		_add_platform(Vector2(x, ground_y), Vector2(170, 20), palette.platform)
-		_add_platform(Vector2(x + 30, ceiling_y), Vector2(148, 18), palette.platform)
-		_add_rect(self, Vector2(x, ground_y - 22), Vector2(26, 16), palette.highlight, 2)
-		_add_rect(self, Vector2(x + 30, ceiling_y + 20), Vector2(24, 14), palette.highlight, 2)
+		_add_platform(Vector2(x, ground_y), Vector2(170, 20), palette.platform, "platform", palette.highlight)
+		_add_platform(Vector2(x + 30, ceiling_y), Vector2(148, 18), palette.platform, "platform", palette.highlight)
 	_add_platform(Vector2(level_length - 70, 320), Vector2(90, 34), palette.highlight)
 	var exit := Area2D.new()
 	exit.position = Vector2(level_length - 70, 275)
@@ -91,8 +96,12 @@ func _build_level() -> void:
 	exit.add_child(exit_shape)
 	exit.body_entered.connect(_on_exit_entered)
 	add_child(exit)
-	_add_rect(exit, Vector2.ZERO, Vector2(58, 88), Color("f5d46f"), 3)
-	_add_rect(exit, Vector2.ZERO, Vector2(34, 62), Color("253848"), 4)
+	var portal = Node2D.new()
+	portal.set_script(load("res://scripts/sprite_node.gd"))
+	portal.tex = SB.portal_texture(SB.world_value(world_index, "accent"))
+	portal.px = 2.0
+	portal.wobble = 0.25
+	exit.add_child(portal)
 	for gap in adjusted_gaps:
 		var g: float = gap.x
 		var gap_width: float = gap.y
@@ -113,9 +122,10 @@ func _build_level() -> void:
 		circle.radius = 18
 		shape.shape = circle
 		star.add_child(shape)
-		var visual := Polygon2D.new()
-		visual.polygon = PackedVector2Array([Vector2(0,-18),Vector2(5,-6),Vector2(18,-5),Vector2(8,3),Vector2(11,16),Vector2(0,9),Vector2(-11,16),Vector2(-8,3),Vector2(-18,-5),Vector2(-5,-6)])
-		visual.color = Color("ffe45e")
+		var visual = Node2D.new()
+		visual.set_script(load("res://scripts/sprite_node.gd"))
+		visual.tex = SB.spr_texture("star")
+		visual.px = 1.4
 		star.add_child(visual)
 		star.body_entered.connect(_collect_star.bind(star))
 		add_child(star)
@@ -155,21 +165,14 @@ func _build_level() -> void:
 	camera.position_smoothing_enabled = true
 	camera.position_smoothing_speed = 7.0
 	add_child(camera)
+	backdrop.camera = camera
 
 func _build_backdrop() -> void:
-	for i in range(28):
-		var x := float(i) * level_length / 27.0
-		var h := 80 + (i * 43 % 210)
-		_add_rect(self, Vector2(x, 280 + float(h) * 0.5), Vector2(90, h), palette.distant, -5)
-		_add_rect(self, Vector2(x + 24, 300 + float(h) * 0.5), Vector2(22, h + 35), palette.distant.darkened(0.12), -4)
-		if world_index == 0:
-			_add_rect(self, Vector2(x + 12, 280 + float(h) * 0.32), Vector2(7, 18), palette.highlight.darkened(0.12), -3)
-			_add_rect(self, Vector2(x - 18, 280 + float(h) * 0.62), Vector2(6, 13), palette.highlight.darkened(0.12), -3)
-		elif world_index == 1:
-			_add_rect(self, Vector2(x - 18, 280 + float(h) * 0.35), Vector2(8, 14), palette.highlight, -3)
-			_add_rect(self, Vector2(x + 18, 280 + float(h) * 0.6), Vector2(7, 18), palette.highlight.darkened(0.12), -3)
-		else:
-			_add_rect(self, Vector2(x, 280 + float(h) * 0.5), Vector2(6, 24), palette.highlight.darkened(0.18), -3)
+	backdrop = Node2D.new()
+	backdrop.set_script(load("res://scripts/backdrop.gd"))
+	backdrop.world = world_index
+	backdrop.z_index = -10
+	add_child(backdrop)
 
 func _is_inside_gap(x: float, gaps: Array[Vector2]) -> bool:
 	for gap in gaps:
@@ -188,8 +191,12 @@ func _add_hazard(x: float) -> void:
 	polygon.points = PackedVector2Array([Vector2(-15, 18), Vector2(-9, -8), Vector2(0, -20), Vector2(9, -8), Vector2(15, 18)])
 	shape.shape = polygon
 	hazard.add_child(shape)
-	_add_rect(hazard, Vector2.ZERO, Vector2(20, 27), palette.enemy.darkened(0.12), 2)
-	_add_rect(hazard, Vector2(0, -11), Vector2(9, 7), palette.highlight, 3)
+	var spike = Node2D.new()
+	spike.set_script(load("res://scripts/sprite_node.gd"))
+	spike.tex = SB.spr_texture("spike")
+	spike.px = 1.0
+	spike.position = Vector2(0, 6)
+	hazard.add_child(spike)
 	hazard.body_entered.connect(_on_hazard_entered)
 	add_child(hazard)
 
@@ -197,7 +204,7 @@ func _on_hazard_entered(body: Node2D) -> void:
 	if body.is_in_group("player"):
 		body.take_damage()
 
-func _add_platform(pos: Vector2, size: Vector2, color: Color) -> StaticBody2D:
+func _add_platform(pos: Vector2, size: Vector2, color: Color, kind := "platform", top := Color.WHITE, dark := Color.BLACK) -> StaticBody2D:
 	var body := StaticBody2D.new()
 	body.position = pos
 	var shape_node := CollisionShape2D.new()
@@ -205,11 +212,12 @@ func _add_platform(pos: Vector2, size: Vector2, color: Color) -> StaticBody2D:
 	rect.size = size
 	shape_node.shape = rect
 	body.add_child(shape_node)
-	var visual := Polygon2D.new()
-	visual.polygon = PackedVector2Array([Vector2(-size.x/2,-size.y/2),Vector2(size.x/2,-size.y/2),Vector2(size.x/2,size.y/2),Vector2(-size.x/2,size.y/2)])
-	visual.color = color
-	body.add_child(visual)
-	_add_rect(body, Vector2(0, -size.y/2 + 3), Vector2(size.x, 5), palette.highlight, 1)
+	if kind == "platform":
+		var visual = Node2D.new()
+		visual.set_script(load("res://scripts/surface_art.gd"))
+		visual.world = world_index
+		visual.size = size
+		body.add_child(visual)
 	add_child(body)
 	return body
 
@@ -241,23 +249,9 @@ func _make_player() -> CharacterBody2D:
 	hero.add_child(collision)
 	var art := Node2D.new()
 	art.name = "HeroArt"
+	art.set_script(load("res://scripts/hero_art.gd"))
 	hero.add_child(art)
-	_add_hero_rect(art, Vector2(0, 3), Vector2(29, 23), Color("e4463a"))
-	_add_hero_rect(art, Vector2(0, 1), Vector2(9, 9), Color("ffd54f"))
-	_add_hero_rect(art, Vector2(-7, 22), Vector2(12, 20), Color("3568c7"))
-	_add_hero_rect(art, Vector2(7, 22), Vector2(12, 20), Color("3568c7"))
-	_add_hero_rect(art, Vector2(-7, 34), Vector2(15, 8), Color("45bd69"))
-	_add_hero_rect(art, Vector2(8, 34), Vector2(15, 8), Color("45bd69"))
-	_add_hero_rect(art, Vector2(0, -14), Vector2(21, 17), Color("e9bd91"))
-	_add_hero_rect(art, Vector2(0, -24), Vector2(23, 8), Color("68432d"))
-	_add_hero_rect(art, Vector2(1, -15), Vector2(3, 3), Color("28233a"))
-	_add_hero_rect(art, Vector2(-7, -7), Vector2(4, 11), Color("e9bd91"))
-	_add_hero_rect(art, Vector2(8, -7), Vector2(4, 11), Color("e9bd91"))
 	return hero
-
-func _add_hero_rect(parent: Node, pos: Vector2, size: Vector2, color: Color) -> void:
-	var art := _add_rect(parent, pos, size, color, 2)
-	art.z_as_relative = true
 
 func _make_enemy(x: float) -> CharacterBody2D:
 	var enemy := CharacterBody2D.new()
@@ -270,11 +264,10 @@ func _make_enemy(x: float) -> CharacterBody2D:
 	rect.size = Vector2(34, 32)
 	collision.shape = rect
 	enemy.add_child(collision)
-	_add_rect(enemy, Vector2.ZERO, Vector2(36, 30), palette.enemy, 2)
-	_add_rect(enemy, Vector2(-7, -3), Vector2(5, 5), Color.WHITE, 3)
-	_add_rect(enemy, Vector2(7, -3), Vector2(5, 5), Color.WHITE, 3)
-	_add_rect(enemy, Vector2(-7, -3), Vector2(2, 3), Color.BLACK, 4)
-	_add_rect(enemy, Vector2(7, -3), Vector2(2, 3), Color.BLACK, 4)
+	var art := Node2D.new()
+	art.set_script(load("res://scripts/slime_art.gd"))
+	art.enemy_color = Color(SB.world_value(world_index, "enemy"))
+	enemy.add_child(art)
 	return enemy
 
 func _on_exit_entered(body: Node2D) -> void:
@@ -294,10 +287,10 @@ func _on_player_died() -> void:
 		return
 	death_handled = true
 	ending = true
-	var had_life := game.lose_life()
+	var had_life: bool = game.lose_life()
 	life_lost.emit()
 	if had_life and game.lives > 0:
-		var ui := get_node("/root/GameUI")
+		var ui = get_node("/root/GameUI")
 		ui.show_message("VIDA PERDIDA", "Reintentando…")
 		ui.retry_after_delay()
 	else:
@@ -314,7 +307,7 @@ func finish_level() -> void:
 
 func _world_palette(world: int) -> Dictionary:
 	if world == 1:
-		return {"sky": Color("243b65"), "distant": Color("3b6080"), "ground": Color("514b59"), "ceiling": Color("343d55"), "platform": Color("697280"), "highlight": Color("f4bb63"), "enemy": Color("df7556")}
+		return {"sky": Color("243b65"), "distant": Color("3b6080"), "ground": Color("514b59"), "ceiling": Color("343d55"), "platform": Color("697280"), "highlight": Color("f4bb63"), "enemy": Color("df7556"), "grass": Color("9fb3d9"), "dark": Color("2a2e3f")}
 	if world == 2:
-		return {"sky": Color("211e3d"), "distant": Color("443052"), "ground": Color("49334a"), "ceiling": Color("30233e"), "platform": Color("69506e"), "highlight": Color("70e6ca"), "enemy": Color("e15b89")}
-	return {"sky": Color("9bd9d7"), "distant": Color("4e9b88"), "ground": Color("654f39"), "ceiling": Color("345d53"), "platform": Color("88ac69"), "highlight": Color("f7cf61"), "enemy": Color("8d594c")}
+		return {"sky": Color("211e3d"), "distant": Color("443052"), "ground": Color("49334a"), "ceiling": Color("30233e"), "platform": Color("69506e"), "highlight": Color("70e6ca"), "enemy": Color("e15b89"), "grass": Color("9b5cc0"), "dark": Color("1a1420")}
+	return {"sky": Color("9bd9d7"), "distant": Color("4e9b88"), "ground": Color("654f39"), "ceiling": Color("345d53"), "platform": Color("88ac69"), "highlight": Color("f7cf61"), "enemy": Color("8d594c"), "grass": Color("7ed957"), "dark": Color("4f3826")}
